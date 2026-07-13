@@ -9,6 +9,36 @@ en local: fichero .env, ver .env.example).
 import os
 
 
+def _redis_storage_uri() -> str | None:
+    """Normaliza REDIS_URL para usarla como backend de Flask-Limiter (y caché).
+
+    Vercel es de solo lectura (solo /tmp es escribible, y es efímero: no
+    sobrevive entre invocaciones ni se comparte entre instancias). Eso hace
+    inútil el backend por defecto `memory://` de Flask-Limiter en
+    serverless: cada invocación puede ejecutarse en una instancia distinta,
+    así que los contadores de intentos de login nunca se acumulan de verdad.
+    Redis, al ser un servicio externo, sí es compartido entre invocaciones.
+
+    Se admite tanto `REDIS_URL` (variable estándar que exponen Upstash,
+    Redis Cloud, Vercel Marketplace, etc.) como alias comunes.
+    """
+    url = (
+        os.environ.get("REDIS_URL")
+        or os.environ.get("KV_URL")  # alias usado por algunos add-ons de Vercel
+        or os.environ.get("REDISCLOUD_URL")
+    )
+    if not url:
+        return None
+    # `redis://` = texto plano, `rediss://` = TLS (Upstash y la mayoría de
+    # proveedores gestionados lo exigen). Se respeta el esquema tal cual
+    # venga en la variable de entorno, solo se valida que sea reconocible.
+    if not (url.startswith("redis://") or url.startswith("rediss://") or url.startswith("unix://")):
+        raise RuntimeError(
+            "REDIS_URL tiene un esquema no soportado; debe empezar por redis:// o rediss://"
+        )
+    return url
+
+
 def _database_url() -> str:
     """Normaliza la URL de base de datos.
 
@@ -66,4 +96,20 @@ class Config:
     # API externa usada por "Importar libros"
     FRAPPE_LIBRARY_API = "https://frappe.io/api/method/frappe-library"
 
-    RATELIMIT_STORAGE_URI = os.environ.get("RATELIMIT_STORAGE_URI", "memory://")
+    REDIS_URL = _redis_storage_uri()
+
+    # Prioridad: RATELIMIT_STORAGE_URI explícita > REDIS_URL > memoria local.
+    # "memory://" NO es fiable en Vercel (ver _redis_storage_uri arriba), así
+    # que si se detecta que se está corriendo en Vercel sin Redis configurado,
+    # se avisa en los logs en tiempo de arranque (ver library/__init__.py).
+    RATELIMIT_STORAGE_URI = os.environ.get("RATELIMIT_STORAGE_URI") or REDIS_URL or "memory://"
+    RATELIMIT_STRATEGY = "fixed-window"
+    # Cabecera para poder usar Redis con TLS de proveedores que usan
+    # certificados no verificados por la CA por defecto del sistema (algunos
+    # planes gratuitos de Upstash/Redis Cloud). Se puede forzar con
+    # REDIS_INSECURE_TLS=1 si el proveedor lo requiere; por defecto se valida.
+    REDIS_INSECURE_TLS = os.environ.get("REDIS_INSECURE_TLS") == "1"
+
+    # Caché opcional (ver library/cache.py). Se activa automáticamente si hay
+    # Redis disponible; si no, la app funciona igual mas sin caché.
+    CACHE_ENABLED = REDIS_URL is not None

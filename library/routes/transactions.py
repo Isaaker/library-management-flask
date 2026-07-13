@@ -4,8 +4,10 @@ from flask import Blueprint, render_template, redirect, url_for, flash
 from flask_login import login_required
 
 from library.extensions import db
+from library.cache import invalidate
 from library.forms import IssueBookForm, ReturnBookForm
 from library.models import Book, Member, Transaction
+from library.routes.main import REPORTS_CACHE_KEY
 
 bp = Blueprint("transactions", __name__)
 
@@ -48,6 +50,7 @@ def issue_book():
 
         db.session.add(tx)
         db.session.commit()
+        invalidate(REPORTS_CACHE_KEY)
 
         flash("Libro prestado", "success")
         return redirect(url_for("transactions.transactions"))
@@ -92,6 +95,7 @@ def return_book(transaction_id):
         tx.book.available_quantity += 1
 
         db.session.commit()
+        invalidate(REPORTS_CACHE_KEY)
 
         flash("Libro devuelto", "success")
         return redirect(url_for("transactions.transactions"))

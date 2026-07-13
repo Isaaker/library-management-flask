@@ -13,7 +13,8 @@ reforzada y soporte de catálogo **MARC21**.
 | Autenticación | Ninguna — cualquiera podía borrar libros/socios | Login obligatorio (`Flask-Login`), contraseñas con hash (`werkzeug.security`), roles admin/bibliotecario |
 | CSRF | No | `Flask-WTF` con token CSRF en todos los formularios |
 | Cabeceras HTTP | No | `Flask-Talisman`: HSTS, CSP, `X-Content-Type-Options`, cookies `HttpOnly`/`Secure`/`SameSite` |
-| Fuerza bruta | Sin límite | `Flask-Limiter` en login/registro |
+| Fuerza bruta | Sin límite | `Flask-Limiter` en login/registro, con backend Redis (fiable en serverless; `memory://` no lo es) |
+| Escrituras en disco | No aplica | Ninguna en producción (Vercel es de solo lectura salvo `/tmp` efímero); MARC21 se procesa en memoria, la BD es externa |
 | Secretos | `app.secret_key = "secret"`, credenciales MySQL en el código | Todo via variables de entorno; falla explícitamente si falta `SECRET_KEY` en producción |
 | Subida de ficheros | No aplica | Límite de tamaño (10 MB), validación de extensión, límite de nº de registros por importación |
 | Catálogo MARC21 | No existía | Importación (.mrc/.marc/.xml) y exportación (por libro o catálogo completo) en MARC21/MARCXML |
@@ -39,6 +40,33 @@ library-management-flask-vercel/
 ├── scripts/init_db.py      # crea las tablas
 └── tests/test_app.py       # pytest
 ```
+
+## Redis (recomendado en Vercel)
+
+Las funciones serverless de Vercel son de **solo lectura**, salvo `/tmp`
+(escribible pero **efímero**: no sobrevive entre invocaciones ni se comparte
+entre instancias). Esto hace inútil en producción el backend por defecto
+`memory://` de `Flask-Limiter`: cada petición puede caer en una instancia
+distinta, así que el contador de intentos de login/registro nunca se
+acumula de verdad y el límite de fuerza bruta queda sin efecto.
+
+Con `REDIS_URL` configurada, esta versión usa Redis automáticamente para:
+
+1. **Rate limiting** (`Flask-Limiter`): límite real de intentos de login/registro, compartido entre todas las invocaciones.
+2. **Caché corta de `/reports`** (30 s): evita repetir las dos consultas de agregación en cada petición. Se invalida automáticamente al crear/editar/borrar libros o socios, o al prestar/devolver un libro.
+
+Si no defines `REDIS_URL`, la app funciona igual (sin caché, y con rate
+limiting en memoria local, no fiable en serverless — verás un aviso en los
+logs de Vercel recordándotelo).
+
+Se admite `redis://` (texto plano) y `rediss://` (TLS, el habitual en
+proveedores gestionados como Upstash). También se leen `KV_URL` y
+`REDISCLOUD_URL` como alias, por si tu proveedor usa otro nombre.
+
+### ¿Es suficiente el free tier de 30 MB?
+
+- **Para rate limiting y caché (el uso que le da esta app): sí, de sobra.** Cada clave ocupa unos pocos bytes (contadores de intentos, o el JSON de `/reports`, que son un puñado de libros/socios). Con 30 MB tienes margen para miles de claves.
+- **Para usar Redis como base de datos principal en lugar de Postgres: no lo recomiendo.** Redis es clave-valor, no relacional: perderías las claves foráneas entre `books`/`members`/`transactions` que garantizan la integridad de préstamos y devoluciones, y tendrías que reimplementar a mano joins, búsquedas por texto (`LIKE`) y agregaciones. Además, 30 MB se queda corto en cuanto importes un catálogo MARC21 grande: cada registro MARCXML almacenado (`Book.marc_xml`) pesa entre 1 y 3 KB, así que unos pocos miles de libros ya rozarían el límite. Mi recomendación: mantén Postgres (Neon/Supabase tienen free tiers de 500 MB–3 GB) como base de datos y usa Redis solo para rate limiting/caché, como está configurado aquí.
 
 ## Despliegue en Vercel
 

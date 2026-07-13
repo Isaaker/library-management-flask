@@ -110,4 +110,14 @@ def create_app(config_object: type = Config) -> Flask:
     if not app.debug:
         logging.basicConfig(level=logging.INFO)
 
+    if app.config.get("VERCEL_ENV") or __import__("os").environ.get("VERCEL"):
+        if not app.config.get("REDIS_URL"):
+            app.logger.warning(
+                "Ejecutando en Vercel sin REDIS_URL configurada: el límite de "
+                "intentos de login (rate limiting) usa memoria local, que NO "
+                "se comparte entre invocaciones serverless y por tanto no "
+                "protege de forma fiable contra fuerza bruta. Configura "
+                "REDIS_URL para solucionarlo."
+            )
+
     return app

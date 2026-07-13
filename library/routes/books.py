@@ -6,8 +6,10 @@ from flask_login import login_required
 from sqlalchemy.exc import IntegrityError
 
 from library.extensions import db
+from library.cache import invalidate
 from library.forms import AddBookForm, ImportBooksForm, SearchBookForm
 from library.models import Book
+from library.routes.main import REPORTS_CACHE_KEY
 
 bp = Blueprint("books", __name__)
 
@@ -52,6 +54,7 @@ def add_book():
         )
         db.session.add(book)
         db.session.commit()
+        invalidate(REPORTS_CACHE_KEY)
         flash("Nuevo libro añadido", "success")
         return redirect(url_for("books.books"))
 
@@ -87,6 +90,7 @@ def edit_book(id):
         book.total_quantity = form.total_quantity.data
 
         db.session.commit()
+        invalidate(REPORTS_CACHE_KEY)
         flash("Libro actualizado", "success")
         return redirect(url_for("books.books"))
 
@@ -109,6 +113,7 @@ def delete_book(id):
         flash("El libro no se pudo eliminar (tiene transacciones asociadas)", "danger")
         return redirect(url_for("books.books"))
 
+    invalidate(REPORTS_CACHE_KEY)
     flash("Libro eliminado", "success")
     return redirect(url_for("books.books"))
 
