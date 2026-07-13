@@ -1,0 +1,44 @@
+{% extends 'layout.html' %}
+{% block body %}
+<br>
+<h1>Buscar libro</h1>
+{% from "includes/_formhelpers.html" import render_field %}
+<form method="POST" action="">
+    {{ form.hidden_tag() }}
+    <div class="form-group">{{ render_field(form.title, class_="form-control") }}</div><br>
+    <div class="form-group">{{ render_field(form.author, class_="form-control") }}</div><br>
+    <p><button type="submit" class="btn btn-primary">Buscar</button></p>
+</form>
+{% if books %}
+<br>
+<h1>Resultados:</h1>
+<hr>
+<table class="table table-hover table-striped">
+    <thead>
+        <tr>
+            <th>ID</th><th>Título</th><th>Autor(es)</th><th>Cantidad total</th><th>Disponibles</th><th>Nº de préstamos</th><th></th><th></th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for book in books %}
+        <tr style="cursor:pointer;">
+            <td><a href="{{ url_for('books.view_book', id=book.id) }}" class="btn btn-dark pull-right">{{ "%05d"|format(book.id) }}</a></td>
+            <td onclick="window.location='{{ url_for('books.view_book', id=book.id) }}';">{{ book.title }}</td>
+            <td onclick="window.location='{{ url_for('books.view_book', id=book.id) }}';">{{ book.author }}</td>
+            <td onclick="window.location='{{ url_for('books.view_book', id=book.id) }}';">{{ book.total_quantity }}</td>
+            <td onclick="window.location='{{ url_for('books.view_book', id=book.id) }}';">{{ book.available_quantity }}</td>
+            <td onclick="window.location='{{ url_for('books.view_book', id=book.id) }}';">{{ book.rented_count }}</td>
+            <td><a href="{{ url_for('books.edit_book', id=book.id) }}" class="btn btn-primary pull-right">Editar</a></td>
+            <td>
+                <form action="{{ url_for('books.delete_book', id=book.id) }}" method="POST"
+                    onsubmit="return confirm('¿Seguro que quieres eliminar este libro?');">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <input type="submit" value="Eliminar" class="btn btn-danger">
+                </form>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endif %}
+{% endblock %}

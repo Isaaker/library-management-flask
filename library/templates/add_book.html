@@ -1,0 +1,24 @@
+{% extends 'layout.html' %}
+{% block body %}
+<br>
+<h1>Añadir libro</h1>
+{% from "includes/_formhelpers.html" import render_field %}
+<form method="POST" action="">
+    {{ form.hidden_tag() }}
+    <div class="form-group">{{ render_field(form.title, class_="form-control") }}</div><br>
+    <div class="form-group">{{ render_field(form.author, class_="form-control") }}</div><br>
+    <div class="form-group">{{ render_field(form.average_rating, class_="form-control") }}</div><br>
+    <div class="form-group">{{ render_field(form.isbn, class_="form-control") }}</div><br>
+    <div class="form-group">{{ render_field(form.isbn13, class_="form-control") }}</div><br>
+    <div class="form-group">{{ render_field(form.language_code, class_="form-control") }}</div><br>
+    <div class="form-group">{{ render_field(form.num_pages, class_="form-control") }}</div><br>
+    <div class="form-group">{{ render_field(form.ratings_count, class_="form-control") }}</div><br>
+    <div class="form-group">{{ render_field(form.text_reviews_count, class_="form-control") }}</div><br>
+    <div class="form-group">{{ render_field(form.publication_date, class_="form-control", type="date") }}</div><br>
+    <div class="form-group">{{ render_field(form.publisher, class_="form-control") }}</div><br>
+    <div class="form-group">{{ render_field(form.total_quantity, class_="form-control") }}</div>
+    <br>
+    {% if error %}<div class="alert alert-danger">{{ error }}</div>{% endif %}
+    <p><button type="submit" class="btn btn-primary">Guardar</button></p>
+</form>
+{% endblock %}

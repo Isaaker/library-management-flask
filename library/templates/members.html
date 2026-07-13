@@ -1,0 +1,37 @@
+{% extends 'layout.html' %}
+{% block body %}
+<br>
+<h1>Socios</h1>
+<a class="btn btn-success" href="{{ url_for('members.add_member') }}">Añadir socio</a>
+<hr>
+{% if members %}
+<table class="table table-striped">
+    <thead>
+        <tr>
+            <th>ID</th><th>Nombre</th><th>Email</th><th>Registrado el</th>
+            <th>Deuda pendiente</th><th>Importe gastado</th><th></th><th></th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for member in members %}
+        <tr>
+            <td>{{ member.id }}</td>
+            <td>{{ member.name }}</td>
+            <td>{{ member.email }}</td>
+            <td>{{ member.registered_on }}</td>
+            <td>{{ member.outstanding_debt }}</td>
+            <td>{{ member.amount_spent }}</td>
+            <td><a href="{{ url_for('members.edit_member', id=member.id) }}" class="btn btn-primary pull-right">Editar</a></td>
+            <td>
+                <form action="{{ url_for('members.delete_member', id=member.id) }}" method="POST"
+                    onsubmit="return confirm('¿Seguro que quieres eliminar este socio?');">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <input type="submit" value="Eliminar" class="btn btn-danger">
+                </form>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endif %}
+{% endblock %}

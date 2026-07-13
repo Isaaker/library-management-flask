@@ -1,0 +1,44 @@
+{% extends 'layout.html' %}
+{% block body %}
+<br>
+<h1>Informes</h1>
+<hr>
+<br>
+{% if books %}
+<h3>Libros más populares</h3>
+<table class="table table-striped table-hover">
+    <thead>
+        <tr><th>ID</th><th>Título</th><th>Autor(es)</th><th>Cantidad total</th><th>Disponibles</th><th>Nº de préstamos</th></tr>
+    </thead>
+    <tbody>
+        {% for book in books %}
+        <tr style="cursor:pointer;">
+            <td><a href="{{ url_for('books.view_book', id=book.id) }}" class="btn btn-dark pull-right">{{ "%05d"|format(book.id) }}</a></td>
+            <td onclick="window.location='{{ url_for('books.view_book', id=book.id) }}';">{{ book.title }}</td>
+            <td onclick="window.location='{{ url_for('books.view_book', id=book.id) }}';">{{ book.author }}</td>
+            <td onclick="window.location='{{ url_for('books.view_book', id=book.id) }}';">{{ book.total_quantity }}</td>
+            <td onclick="window.location='{{ url_for('books.view_book', id=book.id) }}';">{{ book.available_quantity }}</td>
+            <td onclick="window.location='{{ url_for('books.view_book', id=book.id) }}';">{{ book.rented_count }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endif %}
+
+{% if members %}
+<br>
+<h3>Socios que más han gastado</h3>
+<table class="table table-striped">
+    <thead><tr><th>ID</th><th>Nombre</th><th>Importe gastado</th></tr></thead>
+    <tbody>
+        {% for member in members %}
+        <tr>
+            <td><a href="{{ url_for('members.view_member', id=member.id) }}" class="btn btn-dark pull-right">{{ "%03d"|format(member.id) }}</a></td>
+            <td>{{ member.name }}</td>
+            <td>{{ member.amount_spent }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endif %}
+{% endblock %}

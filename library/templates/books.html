@@ -1,0 +1,47 @@
+{% extends 'layout.html' %}
+{% block body %}
+<br>
+<h1>Libros</h1>
+<a class="btn btn-success" href="{{ url_for('books.add_book') }}">Añadir libro</a>
+<a class="btn btn-secondary" href="{{ url_for('books.import_books') }}">Importar desde API</a>
+<a class="btn btn-secondary" href="{{ url_for('marc21.import_marc21') }}">Importar MARC21</a>
+<hr>
+{% if books %}
+<table class="table table-hover table-striped">
+    <thead>
+        <tr>
+            <th>ID</th>
+            <th>Título</th>
+            <th>Autor(es)</th>
+            <th>Cantidad total</th>
+            <th>Disponibles</th>
+            <th>Nº de préstamos</th>
+            <th></th>
+            <th></th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for book in books %}
+        <tr style="cursor:pointer;">
+            <td><a href="{{ url_for('books.view_book', id=book.id) }}" class="btn btn-dark pull-right">{{ "%05d"|format(book.id) }}</a></td>
+            <td onclick="window.location='{{ url_for('books.view_book', id=book.id) }}';">{{ book.title }}</td>
+            <td onclick="window.location='{{ url_for('books.view_book', id=book.id) }}';">{{ book.author }}</td>
+            <td onclick="window.location='{{ url_for('books.view_book', id=book.id) }}';">{{ book.total_quantity }}</td>
+            <td onclick="window.location='{{ url_for('books.view_book', id=book.id) }}';">{{ book.available_quantity }}</td>
+            <td onclick="window.location='{{ url_for('books.view_book', id=book.id) }}';">{{ book.rented_count }}</td>
+            <td><a href="{{ url_for('books.edit_book', id=book.id) }}" class="btn btn-primary pull-right">Editar</a></td>
+            <td><a href="{{ url_for('marc21.export_book', id=book.id) }}" class="btn btn-outline-secondary pull-right">MARC21</a></td>
+            <td>
+                <form action="{{ url_for('books.delete_book', id=book.id) }}" method="POST"
+                    onsubmit="return confirm('¿Seguro que quieres eliminar este libro?');">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <input type="submit" value="Eliminar" class="btn btn-danger">
+                </form>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endif %}
+{% endblock %}

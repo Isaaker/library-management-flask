@@ -1,44 +1,90 @@
-# **Library Management Flask**
+# Library Management (Flask) — versión optimizada para Vercel + MARC21
 
-## **About**
+Versión reescrita de [mituldavid/library-management-flask](https://github.com/mituldavid/library-management-flask),
+lista para desplegar en **Vercel** (función serverless Python), con seguridad
+reforzada y soporte de catálogo **MARC21**.
 
-A Library Management Web Application built in fulfilment of the [Developer Hiring Test for Frappe](https://frappe.io/dev-hiring-test). Allows a librarian to track books and their quantity, members, and transactions.
-(Built with Flask, Jinja, MySQL)
+## Qué ha cambiado respecto al proyecto original
 
-## **Getting Started**
+| Área | Original | Esta versión |
+|---|---|---|
+| Despliegue | Solo `app.run()` local, MySQL fijo a `localhost` | `api/index.py` + `vercel.json` (serverless), config 100% por variables de entorno |
+| Base de datos | `flask_mysqldb` + SQL crudo | SQLAlchemy ORM (Postgres/MySQL/SQLite), sin SQL concatenado en ningún punto |
+| Autenticación | Ninguna — cualquiera podía borrar libros/socios | Login obligatorio (`Flask-Login`), contraseñas con hash (`werkzeug.security`), roles admin/bibliotecario |
+| CSRF | No | `Flask-WTF` con token CSRF en todos los formularios |
+| Cabeceras HTTP | No | `Flask-Talisman`: HSTS, CSP, `X-Content-Type-Options`, cookies `HttpOnly`/`Secure`/`SameSite` |
+| Fuerza bruta | Sin límite | `Flask-Limiter` en login/registro |
+| Secretos | `app.secret_key = "secret"`, credenciales MySQL en el código | Todo via variables de entorno; falla explícitamente si falta `SECRET_KEY` en producción |
+| Subida de ficheros | No aplica | Límite de tamaño (10 MB), validación de extensión, límite de nº de registros por importación |
+| Catálogo MARC21 | No existía | Importación (.mrc/.marc/.xml) y exportación (por libro o catálogo completo) en MARC21/MARCXML |
+| Idioma | Inglés | Español |
 
-1. Install requirements
-   ```sh
+## Estructura
+
+```
+library-management-flask-vercel/
+├── api/index.py            # entry point WSGI para Vercel
+├── run.py                  # servidor de desarrollo local
+├── vercel.json
+├── requirements.txt
+├── library/
+│   ├── __init__.py         # app factory (seguridad, blueprints, errores)
+│   ├── config.py           # configuración vía variables de entorno
+│   ├── extensions.py       # db, login_manager, csrf, limiter
+│   ├── models.py           # User, Member, Book, Transaction
+│   ├── forms.py            # formularios WTForms con validación
+│   ├── marc21.py           # import/export MARC21 con pymarc
+│   ├── routes/             # blueprints: auth, main, books, members, transactions, marc21
+│   └── templates/
+├── scripts/init_db.py      # crea las tablas
+└── tests/test_app.py       # pytest
+```
+
+## Despliegue en Vercel
+
+1. Sube este proyecto a un repositorio de GitHub/GitLab/Bitbucket.
+2. En Vercel, importa el repositorio (detecta `vercel.json` automáticamente).
+3. Configura las variables de entorno del proyecto (Project Settings → Environment Variables):
+   - `SECRET_KEY`: genera una con `python -c "import secrets; print(secrets.token_hex(32))"`
+   - `DATABASE_URL`: cadena de conexión Postgres (recomendado: Vercel Postgres, Neon o Supabase — las funciones serverless no pueden alojar una base de datos en el mismo contenedor).
+   - Opcional `RATELIMIT_STORAGE_URI`: usa Redis (p.ej. Upstash) si tienes varias instancias concurrentes; por defecto usa memoria local (válido para uso ligero).
+4. Despliega. Vercel instalará `requirements.txt` y expondrá `api/index.py`.
+5. Tras el primer despliegue, inicializa las tablas ejecutando localmente (con `DATABASE_URL` apuntando a la BD de producción):
+   ```bash
    pip install -r requirements.txt
+   python scripts/init_db.py
    ```
-2. Setup MySQL and replace host, user, password values in `setupDB.py`, `app.py` and `test.py` as required </br></br>
-3. Create Database and Tables using `setupDB.py`
-   ```sh
-    cd utils
-    python setupDB.py
-    cd ..
-   ```
-4. Run app
-   ```sh
-   python app.py
+6. Crea el primer usuario (se convierte automáticamente en administrador) desde `/register`, o localmente con:
+   ```bash
+   flask --app run create-admin
    ```
 
-## **Screenshots:**
+## Desarrollo local
 
-![1](https://user-images.githubusercontent.com/49085834/121894715-142b1900-cd3d-11eb-8e69-9b75cb96a6fe.png)
-![2](https://user-images.githubusercontent.com/49085834/121894744-1db48100-cd3d-11eb-8025-470a3bf281a8.png)
-![3](https://user-images.githubusercontent.com/49085834/121894765-23aa6200-cd3d-11eb-9424-6f0ce711c222.png)
-![4](https://user-images.githubusercontent.com/49085834/121894850-3f156d00-cd3d-11eb-8c5d-f2206aab7e0a.png)
-![5 1](https://user-images.githubusercontent.com/49085834/121894874-450b4e00-cd3d-11eb-9dc7-476ecd4d061b.png)
-![7](https://user-images.githubusercontent.com/49085834/121894887-489ed500-cd3d-11eb-95e2-335d6b475fec.png)
-![8](https://user-images.githubusercontent.com/49085834/121894898-4b99c580-cd3d-11eb-8d3f-5a76320c4799.png)
-![9 1](https://user-images.githubusercontent.com/49085834/121894915-505e7980-cd3d-11eb-91bf-314edf79005d.png)
-![9 2](https://user-images.githubusercontent.com/49085834/121894980-61a78600-cd3d-11eb-9c0b-cac8944f169e.png)
-![9 3](https://user-images.githubusercontent.com/49085834/121894993-6409e000-cd3d-11eb-9ae4-d2e38101bcae.png)
-![9 4](https://user-images.githubusercontent.com/49085834/121895006-65d3a380-cd3d-11eb-8765-07045b00beec.png)
-![9 5](https://user-images.githubusercontent.com/49085834/121895017-68ce9400-cd3d-11eb-95ba-aa91d25256c3.png)
-![9 6](https://user-images.githubusercontent.com/49085834/121895024-69ffc100-cd3d-11eb-884d-f7e62b0b7d68.png)
-![10 6](https://user-images.githubusercontent.com/49085834/121895080-7a17a080-cd3d-11eb-899e-f2b55e6c5b1e.png)
-![10 4](https://user-images.githubusercontent.com/49085834/121895357-c06cff80-cd3d-11eb-99f6-25a86a85dcea.png)
-![Search](https://user-images.githubusercontent.com/49085834/121896734-40479980-cd3f-11eb-8e78-570c25801596.png)
-![Report](https://user-images.githubusercontent.com/49085834/121896485-f8c10d80-cd3e-11eb-9ef9-c06db4ea6980.png)
+```bash
+cp .env.example .env          # edítalo con tu SECRET_KEY y DATABASE_URL
+pip install -r requirements.txt
+python scripts/init_db.py
+python run.py                 # http://127.0.0.1:5000
+```
+
+## Soporte MARC21
+
+- **Importar** (`/marc21/import`): sube un fichero `.mrc`/`.marc` (ISO 2709) o `.xml` (MARCXML). Se extraen los campos 001, 020, 041, 100/700, 245, 260/264 y 300 y se crea un `Book` por cada registro. Los registros ya importados (mismo campo 001) no se duplican. Límite: 500 registros por fichero.
+- **Exportar un libro** (`/marc21/export/<id>`): descarga el libro como registro MARC21 (MARCXML).
+- **Exportar catálogo completo** (`/marc21/export`): descarga todos los libros como un único fichero MARCXML, compatible con cualquier ILS (Koha, Alma, etc.).
+
+## Tests
+
+```bash
+pip install pytest
+pytest tests/ -v
+```
+
+## Notas de seguridad
+
+- Nunca se ejecuta SQL crudo: todo el acceso a datos pasa por el ORM de SQLAlchemy con parámetros ligados.
+- Todos los formularios de escritura (crear/editar/borrar) exigen sesión iniciada y token CSRF.
+- Las cookies de sesión son `HttpOnly`, `SameSite=Lax` y `Secure` en producción.
+- La API externa de importación de libros usa `timeout` y un límite de páginas para evitar bloqueos o DoS accidental.
+- El registro de nuevas cuentas se deshabilita automáticamente tras crear el primer usuario (administrador); a partir de ahí solo un admin autenticado puede dar de alta cuentas.

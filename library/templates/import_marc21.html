@@ -1,0 +1,15 @@
+{% extends 'layout.html' %}
+{% block body %}
+<br>
+<h1>Importar catálogo MARC21</h1>
+<p class="text-muted">Admite ficheros MARC21 binarios (.mrc, .marc, ISO 2709) o MARCXML (.xml).
+Se leen los campos 001 (número de control), 020 (ISBN), 041 (idioma), 100/700 (autores),
+245 (título), 260/264 (editorial y fecha) y 300 (nº de páginas).</p>
+{% from "includes/_formhelpers.html" import render_field %}
+<form method="POST" action="" enctype="multipart/form-data">
+    {{ form.hidden_tag() }}
+    <div class="form-group">{{ render_field(form.marc_file, class_="form-control") }}</div><br>
+    <div class="form-group">{{ render_field(form.quantity_per_book, class_="form-control") }}</div><br>
+    <p><button type="submit" class="btn btn-primary">Importar</button></p>
+</form>
+{% endblock %}

@@ -1,0 +1,24 @@
+{% extends 'layout.html' %}
+{% block body %}
+{% if member %}
+<br>
+<div class="d-flex justify-content-between">
+    <h2><b>Detalles del socio:</b></h2>
+    <div><a href="{{ url_for('members.edit_member', id=member.id) }}" class="btn btn-primary pull-right">Editar</a></div>
+</div>
+<h4 style="width: 80%;">{{ member.name }}</h4>
+<br>
+<hr>
+<table class="table table-striped">
+    <thead>
+        <tr><th>ID</th><th>Nombre</th><th>Email</th><th>Registrado el</th><th>Deuda pendiente</th><th>Importe gastado</th></tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>{{ member.id }}</td><td>{{ member.name }}</td><td>{{ member.email }}</td>
+            <td>{{ member.registered_on }}</td><td>{{ member.outstanding_debt }}</td><td>{{ member.amount_spent }}</td>
+        </tr>
+    </tbody>
+</table>
+{% endif %}
+{% endblock %}

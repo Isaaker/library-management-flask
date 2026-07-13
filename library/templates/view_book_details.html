@@ -1,0 +1,33 @@
+{% extends 'layout.html' %}
+{% block body %}
+<br>
+{% if book %}
+<div class="d-flex justify-content-between">
+    <h2><b>Detalles del libro:</b></h2>
+    <div>
+        <a href="{{ url_for('marc21.export_book', id=book.id) }}" class="btn btn-outline-secondary pull-right">Exportar MARC21</a>
+        <a href="{{ url_for('books.edit_book', id=book.id) }}" class="btn btn-primary pull-right">Editar</a>
+    </div>
+</div>
+<h4 style="width: 80%;">{{ book.title }}</h4>
+<p style="line-height: 3px;"><i>por {{ book.author }}</i></p>
+<br>
+<hr>
+<table class="table table-left">
+    <tbody>
+        <tr><td>ID</td><td>{{ book.id }}</td><td>Título</td><td>{{ book.title }}</td></tr>
+        <tr><td>Autor(es)</td><td>{{ book.author }}</td><td>Valoración media</td><td>{{ book.average_rating }}</td></tr>
+        <tr><td>ISBN</td><td>{{ book.isbn }}</td><td>ISBN13</td><td>{{ book.isbn13 }}</td></tr>
+        <tr><td>Idioma</td><td>{{ book.language_code }}</td><td>Nº de páginas</td><td>{{ book.num_pages }}</td></tr>
+        <tr><td>Nº de valoraciones</td><td>{{ book.ratings_count }}</td><td>Nº de reseñas</td><td>{{ book.text_reviews_count }}</td></tr>
+        <tr><td>Fecha de publicación</td><td>{{ book.publication_date }}</td><td>Editorial</td><td>{{ book.publisher }}</td></tr>
+        <tr><td>Cantidad total</td><td>{{ book.total_quantity }}</td><td>Disponibles</td><td>{{ book.available_quantity }}</td></tr>
+        <tr><td>Nº de préstamos</td><td>{{ book.rented_count }}</td><td>Nº control MARC21</td><td>{{ book.marc_control_number or '-' }}</td></tr>
+    </tbody>
+</table>
+{% endif %}
+<style>
+    td { padding: 15px !important; }
+    td:nth-child(odd) { font-weight: bold; }
+</style>
+{% endblock %}

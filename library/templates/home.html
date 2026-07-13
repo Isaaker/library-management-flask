@@ -1,0 +1,19 @@
+{% extends 'layout.html' %}
+{% block body %}
+<div class="px-4 py-5 my-5 text-center">
+    <h1 class="display-5 fw-bold">Sistema de Gestión Bibliotecaria</h1>
+    <div class="col-lg-7 mx-auto">
+        <p class="lead mb-4">
+            Aplicación web para gestionar libros, socios, préstamos y devoluciones,
+            con soporte de catálogo <strong>MARC21</strong> (importación y exportación) y
+            desplegable en Vercel.
+        </p>
+        <div class="d-grid gap-2 d-sm-flex justify-content-sm-center flex-wrap">
+            <a href="{{ url_for('main.reports') }}" class="btn btn-primary btn-lg px-4">Informes</a>
+            <a href="{{ url_for('books.books') }}" class="btn btn-outline-secondary btn-lg px-4">Libros</a>
+            <a href="{{ url_for('members.members') }}" class="btn btn-outline-secondary btn-lg px-4">Socios</a>
+            <a href="{{ url_for('transactions.transactions') }}" class="btn btn-outline-secondary btn-lg px-4">Transacciones</a>
+        </div>
+    </div>
+</div>
+{% endblock %}
