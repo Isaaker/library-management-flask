@@ -15,16 +15,18 @@ def create_app(config_object: type = Config) -> Flask:
     db.init_app(app)
     csrf.init_app(app)
     limiter.init_app(app)
-
-    login_manager.init_app(app)
-    login_manager.login_view = "auth.login"
-    login_manager.login_message = "Inicia sesión para continuar"
-    login_manager.login_message_category = "warning"
-
-    @login_manager.user_loader
-    def load_user(user_id):
-        from library.models import User
-        return db.session.get(User, int(user_id))
+    
+    from sqlalchemy import inspect
+    
+    with app.app_context():
+        inspector = inspect(db.engine)
+    
+        if not inspector.get_table_names():
+            app.logger.info(
+                "Base de datos vacía. Creando todas las tablas..."
+            )
+            db.create_all()
+            app.logger.info("Tablas creadas correctamente.")
 
     # --- Cabeceras de seguridad (Talisman) ---
     # Fuerza HTTPS, HSTS, X-Content-Type-Options, X-Frame-Options y una
