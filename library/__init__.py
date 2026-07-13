@@ -11,36 +11,54 @@ def create_app(config_object: type = Config) -> Flask:
     app = Flask(__name__)
     app.config.from_object(config_object)
 
-    # --- Extensiones ---
+    # ------------------------------------------------------------------
+    # Extensiones
+    # ------------------------------------------------------------------
     db.init_app(app)
+    login_manager.init_app(app)
     csrf.init_app(app)
     limiter.init_app(app)
-    
+
+    # Configuración de Flask-Login
+    login_manager.login_view = "auth.login"
+    login_manager.login_message = "Debes iniciar sesión para acceder a esta página."
+    login_manager.login_message_category = "warning"
+
+    # Importar modelos para registrarlos en SQLAlchemy
+    from library.models import User, Member, Book, Transaction
+
+    @login_manager.user_loader
+    def load_user(user_id):
+        return db.session.get(User, int(user_id))
+
+    # Crear automáticamente las tablas si la base de datos está vacía
     from sqlalchemy import inspect
-    
+
     with app.app_context():
         inspector = inspect(db.engine)
-    
+
         if not inspector.get_table_names():
-            app.logger.info(
-                "Base de datos vacía. Creando todas las tablas..."
-            )
+            app.logger.info("Base de datos vacía. Creando tablas...")
             db.create_all()
             app.logger.info("Tablas creadas correctamente.")
 
-    # --- Cabeceras de seguridad (Talisman) ---
-    # Fuerza HTTPS, HSTS, X-Content-Type-Options, X-Frame-Options y una
-    # Content-Security-Policy que solo permite los CDN de Bootstrap ya usados
-    # por las plantillas. `force_https` se desactiva en local para no romper
-    # el desarrollo en http://127.0.0.1.
+    # ------------------------------------------------------------------
+    # Cabeceras de seguridad
+    # ------------------------------------------------------------------
     is_production = bool(app.config.get("SESSION_COOKIE_SECURE"))
+
     csp = {
         "default-src": "'self'",
         "script-src": ["'self'", "https://cdn.jsdelivr.net"],
-        "style-src": ["'self'", "https://cdn.jsdelivr.net", "'unsafe-inline'"],
+        "style-src": [
+            "'self'",
+            "https://cdn.jsdelivr.net",
+            "'unsafe-inline'",
+        ],
         "img-src": ["'self'", "data:"],
         "font-src": ["'self'", "https://cdn.jsdelivr.net"],
     }
+
     Talisman(
         app,
         force_https=is_production,
@@ -49,7 +67,9 @@ def create_app(config_object: type = Config) -> Flask:
         session_cookie_secure=is_production,
     )
 
-    # --- Blueprints ---
+    # ------------------------------------------------------------------
+    # Blueprints
+    # ------------------------------------------------------------------
     from library.routes.auth import bp as auth_bp
     from library.routes.main import bp as main_bp
     from library.routes.members import bp as members_bp
@@ -64,7 +84,9 @@ def create_app(config_object: type = Config) -> Flask:
     app.register_blueprint(transactions_bp)
     app.register_blueprint(marc21_bp)
 
-    # --- Manejo de errores ---
+    # ------------------------------------------------------------------
+    # Errores
+    # ------------------------------------------------------------------
     @app.errorhandler(404)
     def not_found(e):
         return render_template("errors/404.html"), 404
@@ -82,47 +104,58 @@ def create_app(config_object: type = Config) -> Flask:
     def too_large(e):
         return render_template("errors/413.html"), 413
 
-    # --- CLI: inicialización de base de datos ---
+    # ------------------------------------------------------------------
+    # CLI
+    # ------------------------------------------------------------------
     @app.cli.command("init-db")
     def init_db():
-        """Crea las tablas en la base de datos configurada (sin pooler, para DDL)."""
+        """Crea las tablas usando la conexión UNPOOLED."""
         from sqlalchemy import create_engine
+
         engine = create_engine(app.config["SQLALCHEMY_DATABASE_URI_UNPOOLED"])
         db.metadata.create_all(bind=engine)
         engine.dispose()
+
         print("Base de datos inicializada.")
 
     @app.cli.command("create-admin")
     def create_admin():
-        """Crea (o promueve) un usuario administrador de forma interactiva."""
+        """Crea o promociona un administrador."""
         import getpass
-        from library.models import User
 
         username = input("Usuario: ").strip()
         email = input("Email: ").strip().lower()
         password = getpass.getpass("Contraseña: ")
 
         user = User.query.filter_by(username=username).first()
+
         if user is None:
-            user = User(username=username, email=email, role="admin")
+            user = User(
+                username=username,
+                email=email,
+                role="admin",
+            )
         else:
             user.role = "admin"
+
         user.set_password(password)
+
         db.session.add(user)
         db.session.commit()
+
         print(f"Usuario administrador '{username}' listo.")
 
+    # ------------------------------------------------------------------
+    # Logging
+    # ------------------------------------------------------------------
     if not app.debug:
         logging.basicConfig(level=logging.INFO)
 
     if app.config.get("VERCEL_ENV") or __import__("os").environ.get("VERCEL"):
         if not app.config.get("REDIS_URL"):
             app.logger.warning(
-                "Ejecutando en Vercel sin REDIS_URL configurada: el límite de "
-                "intentos de login (rate limiting) usa memoria local, que NO "
-                "se comparte entre invocaciones serverless y por tanto no "
-                "protege de forma fiable contra fuerza bruta. Configura "
-                "REDIS_URL para solucionarlo."
+                "Ejecutando en Vercel sin REDIS_URL configurada: "
+                "el rate limiting utiliza memoria local."
             )
 
     return app
