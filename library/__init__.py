@@ -83,8 +83,11 @@ def create_app(config_object: type = Config) -> Flask:
     # --- CLI: inicialización de base de datos ---
     @app.cli.command("init-db")
     def init_db():
-        """Crea las tablas en la base de datos configurada."""
-        db.create_all()
+        """Crea las tablas en la base de datos configurada (sin pooler, para DDL)."""
+        from sqlalchemy import create_engine
+        engine = create_engine(app.config["SQLALCHEMY_DATABASE_URI_UNPOOLED"])
+        db.metadata.create_all(bind=engine)
+        engine.dispose()
         print("Base de datos inicializada.")
 
     @app.cli.command("create-admin")

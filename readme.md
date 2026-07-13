@@ -41,6 +41,16 @@ library-management-flask-vercel/
 └── tests/test_app.py       # pytest
 ```
 
+## Base de datos: Neon
+
+Se leen directamente las variables tal como las expone Neon (o la
+integración de Neon en Vercel), sin necesidad de transformarlas a mano:
+
+- `DATABASE_URL` (con PgBouncer/pooler) se usa para las consultas normales de la app — importante en serverless, donde cada invocación abre su propia conexión y un pooler evita agotar las conexiones de Postgres.
+- `DATABASE_URL_UNPOOLED` (conexión directa) se usa solo para crear tablas (`scripts/init_db.py`, comando `flask init-db`), ya que PgBouncer en modo *transaction pooling* puede dar problemas con operaciones de sesión que algunas herramientas de esquema necesitan.
+- También se admiten los alias `POSTGRES_URL` / `POSTGRES_URL_NON_POOLING` / `POSTGRES_PRISMA_URL` (integración de Vercel Postgres Templates) y, como último recurso, se reconstruye la URL a partir de `PGHOST`/`PGUSER`/`PGPASSWORD`/`PGDATABASE` si no hay ninguna URL completa.
+- Se fuerza `sslmode=require` si no viene ya en la URL (Neon exige TLS).
+
 ## Redis (recomendado en Vercel)
 
 Las funciones serverless de Vercel son de **solo lectura**, salvo `/tmp`
@@ -72,17 +82,18 @@ proveedores gestionados como Upstash). También se leen `KV_URL` y
 
 1. Sube este proyecto a un repositorio de GitHub/GitLab/Bitbucket.
 2. En Vercel, importa el repositorio (detecta `vercel.json` automáticamente).
-3. Configura las variables de entorno del proyecto (Project Settings → Environment Variables):
+3. Añade la integración de **Neon** desde el marketplace de Vercel (o crea el proyecto en neon.tech y copia sus variables a mano). Al conectarla, Vercel rellena automáticamente `DATABASE_URL`, `DATABASE_URL_UNPOOLED`, `PGHOST`, etc. en el proyecto — no hace falta tocar nada más, la app las detecta solas.
+4. Configura el resto de variables de entorno del proyecto (Project Settings → Environment Variables):
    - `SECRET_KEY`: genera una con `python -c "import secrets; print(secrets.token_hex(32))"`
-   - `DATABASE_URL`: cadena de conexión Postgres (recomendado: Vercel Postgres, Neon o Supabase — las funciones serverless no pueden alojar una base de datos en el mismo contenedor).
-   - Opcional `RATELIMIT_STORAGE_URI`: usa Redis (p.ej. Upstash) si tienes varias instancias concurrentes; por defecto usa memoria local (válido para uso ligero).
-4. Despliega. Vercel instalará `requirements.txt` y expondrá `api/index.py`.
-5. Tras el primer despliegue, inicializa las tablas ejecutando localmente (con `DATABASE_URL` apuntando a la BD de producción):
+   - `REDIS_URL` (opcional pero recomendado, ver sección Redis más abajo).
+5. Despliega. Vercel instalará `requirements.txt` y expondrá `api/index.py`.
+6. Tras el primer despliegue, inicializa las tablas ejecutando localmente (con las variables de Neon de producción en tu `.env`):
    ```bash
    pip install -r requirements.txt
    python scripts/init_db.py
    ```
-6. Crea el primer usuario (se convierte automáticamente en administrador) desde `/register`, o localmente con:
+   Esto usa `DATABASE_URL_UNPOOLED` (la conexión directa, sin PgBouncer) para el DDL, tal como recomienda Neon.
+7. Crea el primer usuario (se convierte automáticamente en administrador) desde `/register`, o localmente con:
    ```bash
    flask --app run create-admin
    ```

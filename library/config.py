@@ -39,25 +39,74 @@ def _redis_storage_uri() -> str | None:
     return url
 
 
-def _database_url() -> str:
-    """Normaliza la URL de base de datos.
+def _database_url(unpooled: bool = False) -> str:
+    """Normaliza la URL de base de datos, con soporte específico para Neon.
 
-    Vercel Postgres / Neon / Supabase suelen exponer `POSTGRES_URL` o
-    `DATABASE_URL` con el esquema `postgres://`, que SQLAlchemy 2.x ya no
-    acepta (requiere `postgresql://`). Se corrige automáticamente.
-    Si no hay ninguna configurada, se usa SQLite local como fallback para
-    desarrollo (NO recomendado en producción/serverless).
+    Neon (y la integración de Vercel Postgres/Neon) expone varias variables
+    de entorno. Prioridad de lectura:
+
+      - Conexión normal (para la app, vía PgBouncer / connection pooling):
+        DATABASE_URL > POSTGRES_URL > POSTGRES_PRISMA_URL
+      - Conexión sin pooler (para DDL: crear tablas, migraciones):
+        DATABASE_URL_UNPOOLED > POSTGRES_URL_NON_POOLING
+
+    Se usa `unpooled=True` únicamente para operaciones DDL (ver
+    scripts/init_db.py y el comando `flask init-db`), porque PgBouncer en
+    modo "transaction pooling" (el que usa Neon para DATABASE_URL) no
+    soporta bien sentencias de sesión/advisory locks que algunas
+    herramientas de migración necesitan. Para las consultas normales de la
+    app (lo que hace la inmensa mayoría del tráfico) el pooler es lo
+    recomendado, especialmente en serverless: cada invocación abre su
+    propia conexión y un pooler evita agotar las conexiones de Postgres.
     """
-    url = (
-        os.environ.get("DATABASE_URL")
-        or os.environ.get("POSTGRES_URL")
-        or os.environ.get("POSTGRES_PRISMA_URL")
-        or "sqlite:///local_library.db"
-    )
+    if unpooled:
+        url = (
+            os.environ.get("DATABASE_URL_UNPOOLED")
+            or os.environ.get("POSTGRES_URL_NON_POOLING")
+            or os.environ.get("DATABASE_URL")
+            or os.environ.get("POSTGRES_URL")
+            or os.environ.get("POSTGRES_PRISMA_URL")
+        )
+    else:
+        url = (
+            os.environ.get("DATABASE_URL")
+            or os.environ.get("POSTGRES_URL")
+            or os.environ.get("POSTGRES_PRISMA_URL")
+            or os.environ.get("DATABASE_URL_UNPOOLED")
+            or os.environ.get("POSTGRES_URL_NON_POOLING")
+        )
+
+    if not url:
+        # Fallback: construir la URL a partir de los parámetros sueltos que
+        # también expone Neon (PGHOST, PGUSER, etc.), si están presentes.
+        host = os.environ.get("PGHOST_UNPOOLED" if unpooled else "PGHOST") or os.environ.get(
+            "POSTGRES_HOST"
+        )
+        user = os.environ.get("PGUSER") or os.environ.get("POSTGRES_USER")
+        password = os.environ.get("PGPASSWORD") or os.environ.get("POSTGRES_PASSWORD")
+        dbname = os.environ.get("PGDATABASE") or os.environ.get("POSTGRES_DATABASE")
+        if host and user and dbname:
+            from urllib.parse import quote_plus
+            auth = quote_plus(user) + (f":{quote_plus(password)}" if password else "")
+            url = f"postgresql://{auth}@{host}/{dbname}?sslmode=require"
+
+    if not url:
+        # Sin ninguna variable de Neon/Postgres presente: SQLite local, solo
+        # para desarrollo (NO usar en Vercel, el filesystem es de solo
+        # lectura salvo /tmp, que es efímero).
+        return "sqlite:///local_library.db"
+
     if url.startswith("postgres://"):
         url = url.replace("postgres://", "postgresql+psycopg2://", 1)
     elif url.startswith("postgresql://") and "+psycopg2" not in url:
         url = url.replace("postgresql://", "postgresql+psycopg2://", 1)
+
+    # Neon exige TLS; si la variable no trae sslmode, se añade explícitamente
+    # en vez de confiar en el valor por defecto del driver.
+    if "sslmode=" not in url:
+        sep = "&" if "?" in url else "?"
+        url = f"{url}{sep}sslmode=require"
+
     return url
 
 
@@ -72,6 +121,8 @@ class Config:
         SECRET_KEY = "dev-only-insecure-secret-change-me"  # solo para desarrollo local
 
     SQLALCHEMY_DATABASE_URI = _database_url()
+    # Se usa solo para DDL (crear tablas / migraciones), ver scripts/init_db.py
+    SQLALCHEMY_DATABASE_URI_UNPOOLED = _database_url(unpooled=True)
     SQLALCHEMY_ENGINE_OPTIONS = {
         # pool_pre_ping evita errores de conexión "stale" típicos de entornos
         # serverless (Vercel) donde la función puede reutilizar/recrear
